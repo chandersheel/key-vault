@@ -1,0 +1,696 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Key Vault</title>
+<meta name="description" content="Encrypted records of your keys, with a lost-key request flow for authorised services.">
+<meta name="theme-color" content="#1f3a5f">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+:root {
+  --bg: #f4f6f9; --surface: #ffffff; --text: #18202b; --muted: #5d6878;
+  --line: #dde2ea; --accent: #1f5fae; --accent-text: #ffffff; --danger: #b3261e;
+  --ok: #1e7b45; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f141b; --surface: #18202b; --text: #e7ecf3; --muted: #9aa6b6;
+    --line: #2a3442; --accent: #6aa5f0; --accent-text: #0b1420; --danger: #f2827a;
+    --ok: #6fd39a; --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f141b; --surface: #18202b; --text: #e7ecf3; --muted: #9aa6b6;
+  --line: #2a3442; --accent: #6aa5f0; --accent-text: #0b1420; --danger: #f2827a;
+  --ok: #6fd39a; --shadow: none;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.bar {
+  position: sticky; top: 0; z-index: 5; background: var(--surface);
+  border-bottom: 1px solid var(--line); padding: 8px 16px;
+  padding-top: max(8px, env(safe-area-inset-top));
+}
+.bar-inner { max-width: 720px; margin: 0 auto; display: flex; align-items: center; gap: 8px; }
+.brand { font-weight: 700; margin-right: auto; display: flex; align-items: center; gap: 8px; }
+.brand img { width: 24px; height: 24px; }
+nav { display: flex; gap: 4px; flex-wrap: wrap; }
+main { max-width: 720px; margin: 0 auto; padding: 16px 16px 48px; }
+h1 { font-size: 1.4rem; margin: 8px 0 16px; }
+h2 { font-size: 1.1rem; margin: 24px 0 8px; }
+p { margin: 0 0 12px; }
+.muted, .hint { color: var(--muted); }
+.hint { font-size: .9rem; margin-top: -4px; }
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  padding: 16px; box-shadow: var(--shadow);
+}
+.stack > * + * { margin-top: 14px; }
+label { display: block; font-weight: 600; font-size: .95rem; }
+input[type=text], input[type=password], input[type=search], select, textarea {
+  display: block; width: 100%; margin-top: 4px; padding: 10px 12px; font: inherit;
+  color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+}
+input:focus, select:focus, textarea:focus, .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.check { display: flex; gap: 10px; align-items: flex-start; font-weight: 500; }
+.check input { margin-top: 4px; width: 18px; height: 18px; flex: none; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 40px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--text); font: inherit; font-weight: 600; cursor: pointer;
+  text-decoration: none;
+}
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.btn.danger { color: var(--danger); border-color: var(--danger); background: transparent; }
+.btn.ghost { background: transparent; }
+.btn.small { min-height: 34px; padding: 4px 10px; font-size: .9rem; }
+.btn.nav { border: 0; background: transparent; padding: 6px 10px; min-height: 36px; }
+.btn.nav[aria-current="page"] { background: var(--bg); }
+.btn:disabled { opacity: .6; cursor: progress; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.row.end { justify-content: flex-end; }
+.error { color: var(--danger); font-weight: 600; min-height: 1.5em; margin: 0; }
+.list { display: grid; gap: 10px; list-style: none; padding: 0; margin: 0; }
+.item {
+  display: flex; gap: 12px; align-items: center; width: 100%; text-align: left;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px;
+  color: inherit; font: inherit; cursor: pointer; box-shadow: var(--shadow);
+}
+.item .t { font-weight: 700; }
+.item .s { color: var(--muted); font-size: .9rem; }
+.thumb {
+  width: 64px; height: 64px; flex: none; border-radius: 8px; background: var(--bg);
+  border: 1px solid var(--line); overflow: hidden; display: grid; place-items: center;
+  color: var(--muted); font-size: .75rem; text-align: center;
+}
+.thumb img { width: 100%; height: 100%; object-fit: cover; }
+.photos { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin: 0; }
+.photos legend { font-weight: 600; padding: 0 4px; }
+.slot { display: flex; gap: 12px; align-items: center; }
+.slot + .slot { margin-top: 12px; }
+.slot .thumb { width: 88px; height: 88px; }
+.slot-label { font-weight: 600; margin-bottom: 6px; }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
+dt { color: var(--muted); }
+dd { margin: 0; overflow-wrap: anywhere; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.gallery figure { margin: 0; }
+.gallery img { width: 100%; border-radius: 8px; border: 1px solid var(--line); display: block; }
+.gallery figcaption { font-size: .85rem; color: var(--muted); margin-top: 4px; }
+pre.request {
+  white-space: pre-wrap; background: var(--bg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 12px; font: .9rem/1.5 ui-monospace, Consolas, monospace; margin: 0;
+}
+ol.steps { padding-left: 20px; margin: 0; }
+ol.steps li + li { margin-top: 6px; }
+.empty { text-align: center; padding: 32px 16px; }
+.lockscreen { max-width: 420px; margin: 8vh auto 0; }
+.lockscreen .logo { width: 56px; height: 56px; display: block; margin: 0 auto 12px; }
+.lockscreen h1 { text-align: center; }
+.toast {
+  position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%);
+  background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 8px;
+  max-width: calc(100% - 32px); font-weight: 600; z-index: 10;
+}
+@media (max-width: 480px) {
+  .brand span { display: none; }
+  dl { grid-template-columns: 1fr; gap: 0; }
+  dd { margin-bottom: 8px; }
+}
+</style>
+</head>
+<body>
+<header class="bar" id="bar" hidden>
+  <div class="bar-inner">
+    <div class="brand"><img src="icon.svg" alt=""><span>Key Vault</span></div>
+    <nav>
+      <button class="btn nav" data-act="go" data-view="list">Keys</button>
+      <button class="btn nav" data-act="go" data-view="guide">Guide</button>
+      <button class="btn nav" data-act="go" data-view="settings">Settings</button>
+      <button class="btn nav" data-act="lock">Lock</button>
+    </nav>
+  </div>
+</header>
+<main id="app"></main>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+'use strict';
+
+/* ---------- constants ---------- */
+const LOCK_TYPES = ['Door cylinder', 'Padlock', 'Almirah / cupboard', 'Mortise lock', 'Rim lock', 'Vehicle', 'Other'];
+const KEY_TYPES = ['Flat (single-sided)', 'Flat (double-sided)', 'Lever key', 'Dimple / computer key', 'Other'];
+const PHOTO_SLOTS = [
+  { id: 'front', label: 'Key: side 1' },
+  { id: 'back', label: 'Key: side 2' },
+  { id: 'proof', label: 'Proof of ownership (bill or key card)' },
+];
+const PBKDF2_ITERATIONS = 310000;
+const IDLE_LOCK_MS = 5 * 60 * 1000;
+
+/* ---------- helpers ---------- */
+const $ = (sel, root = document) => root.querySelector(sel);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+
+function toB64(buf) {
+  const bytes = new Uint8Array(buf);
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+function fromB64(s) {
+  const bin = atob(s);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, 2800);
+}
+
+/* ---------- storage (IndexedDB) ---------- */
+const DB = {
+  db: null,
+  open() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('keyvault', 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        db.createObjectStore('meta');
+        db.createObjectStore('keys', { keyPath: 'id' });
+      };
+      req.onsuccess = () => { this.db = req.result; resolve(); };
+      req.onerror = () => reject(req.error);
+    });
+  },
+  tx(store, mode, fn) {
+    return new Promise((resolve, reject) => {
+      const t = this.db.transaction(store, mode);
+      const req = fn(t.objectStore(store));
+      t.oncomplete = () => resolve(req && req.result);
+      t.onerror = () => reject(t.error);
+      t.onabort = () => reject(t.error);
+    });
+  },
+  get(store, key) { return this.tx(store, 'readonly', s => s.get(key)); },
+  put(store, value, key) { return this.tx(store, 'readwrite', s => key === undefined ? s.put(value) : s.put(value, key)); },
+  del(store, key) { return this.tx(store, 'readwrite', s => s.delete(key)); },
+  all(store) { return this.tx(store, 'readonly', s => s.getAll()); },
+  clear(store) { return this.tx(store, 'readwrite', s => s.clear()); },
+};
+
+/* ---------- crypto (PBKDF2 -> AES-GCM) ---------- */
+async function deriveKey(passphrase, salt) {
+  const base = await crypto.subtle.importKey('raw', enc.encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+    base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+async function seal(key, obj) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(JSON.stringify(obj)));
+  return { iv, ct };
+}
+async function unseal(key, { iv, ct }) {
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+  return JSON.parse(dec.decode(pt));
+}
+const CHECK_VALUE = { vault: 'keyvault' };
+async function verify(key, check) {
+  try { return (await unseal(key, check)).vault === 'keyvault'; } catch { return false; }
+}
+
+/* ---------- images ---------- */
+function compressImage(file, max = 1600) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read that image.')); };
+    img.src = url;
+  });
+}
+function dataUrlToFile(dataUrl, name) {
+  const [head, body] = dataUrl.split(',');
+  const mime = head.match(/:(.*?);/)[1];
+  return new File([fromB64(body)], name, { type: mime });
+}
+
+/* ---------- state ---------- */
+const S = {
+  hasVault: false,
+  key: null,       // CryptoKey while unlocked
+  items: [],       // decrypted key records while unlocked
+  view: 'list',
+  currentId: null,
+  draft: null,
+};
+const current = () => S.items.find(k => k.id === S.currentId);
+
+async function loadItems() {
+  const records = await DB.all('keys');
+  const items = [];
+  for (const r of records) items.push({ ...(await unseal(S.key, r)), id: r.id, updated: r.updated });
+  S.items = items.sort((a, b) => a.name.localeCompare(b.name));
+}
+async function saveItem(item) {
+  const { id, updated, ...data } = item;
+  const sealed = await seal(S.key, data);
+  await DB.put('keys', { id, updated, ...sealed });
+}
+
+/* ---------- auto-lock ---------- */
+let idleTimer;
+function resetIdle() {
+  clearTimeout(idleTimer);
+  if (S.key) idleTimer = setTimeout(() => lock('Locked after 5 minutes of inactivity.'), IDLE_LOCK_MS);
+}
+['pointerdown', 'keydown', 'scroll'].forEach(ev => addEventListener(ev, resetIdle, { passive: true }));
+function lock(msg) {
+  S.key = null; S.items = []; S.draft = null; S.currentId = null; S.view = 'list';
+  clearTimeout(idleTimer);
+  render();
+  if (msg) toast(msg);
+}
+
+/* ---------- views ---------- */
+function viewSetup() {
+  return `<section class="lockscreen card stack">
+    <img class="logo" src="icon.svg" alt="">
+    <h1>Create your vault</h1>
+    <p class="muted">Your key records are encrypted on this phone with a passphrase only you know.</p>
+    <form id="setupForm" class="stack">
+      <label>Passphrase <input type="password" name="pass" minlength="8" autocomplete="new-password" required></label>
+      <label>Confirm passphrase <input type="password" name="pass2" minlength="8" autocomplete="new-password" required></label>
+      <p class="hint">At least 8 characters. There is no recovery: if you forget it, the vault cannot be opened.</p>
+      <p class="error" id="err"></p>
+      <button class="btn primary" style="width:100%">Create vault</button>
+    </form>
+  </section>`;
+}
+function viewUnlock() {
+  return `<section class="lockscreen card stack">
+    <img class="logo" src="icon.svg" alt="">
+    <h1>Key Vault</h1>
+    <form id="unlockForm" class="stack">
+      <label>Passphrase <input type="password" name="pass" autocomplete="current-password" required autofocus></label>
+      <p class="error" id="err"></p>
+      <button class="btn primary" style="width:100%">Unlock</button>
+    </form>
+  </section>`;
+}
+function viewList() {
+  const head = `<div class="row" style="align-items:center;justify-content:space-between">
+      <h1>My keys</h1><button class="btn primary" data-act="add">+ Add key</button></div>`;
+  if (!S.items.length) {
+    return head + `<div class="card empty stack">
+      <p><strong>No keys saved yet.</strong></p>
+      <p class="muted">Record each key's lock, key number and photos now, so a lost key is easy to replace through an authorised service.</p>
+      <button class="btn primary" data-act="add">Add your first key</button></div>`;
+  }
+  return head + `<ul class="list">${S.items.map(k => `<li>
+    <button class="item" data-act="open" data-id="${esc(k.id)}">
+      <div class="thumb">${k.photos.front ? `<img src="${k.photos.front}" alt="">` : 'No photo'}</div>
+      <div><div class="t">${esc(k.name)}</div>
+        <div class="s">${esc([k.brand, k.lockType, k.location].filter(Boolean).join(' · '))}</div>
+        <div class="s">${k.keyNumber ? 'Key no. recorded' : 'No key number'}${k.photos.proof ? ' · Proof saved' : ''}</div></div>
+    </button></li>`).join('')}</ul>`;
+}
+function viewDetail() {
+  const k = current();
+  if (!k) { S.view = 'list'; return viewList(); }
+  const rows = [
+    ['Location', k.location], ['Brand', k.brand], ['Lock type', k.lockType],
+    ['Key type', k.keyType], ['Key number', k.keyNumber], ['Notes', k.notes],
+    ['Last updated', new Date(k.updated).toLocaleString()],
+  ].filter(([, v]) => v);
+  const pics = PHOTO_SLOTS.filter(p => k.photos[p.id]);
+  return `<button class="btn ghost small" data-act="go" data-view="list">← All keys</button>
+    <h1>${esc(k.name)}</h1>
+    <div class="card stack">
+      <dl>${rows.map(([t, v]) => `<dt>${t}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
+    </div>
+    ${pics.length ? `<h2>Photos</h2><div class="gallery">${pics.map(p =>
+      `<figure><img src="${k.photos[p.id]}" alt="${esc(p.label)}"><figcaption>${esc(p.label)}</figcaption></figure>`).join('')}</div>` : ''}
+    <h2>Actions</h2>
+    <div class="row">
+      <button class="btn primary" data-act="lost">I lost this key</button>
+      <button class="btn" data-act="edit">Edit</button>
+      <button class="btn danger" data-act="delete">Delete</button>
+    </div>`;
+}
+const field = (name, label, value, placeholder = '', required = false) =>
+  `<label>${label}${required ? ' *' : ''} <input type="text" name="${name}" value="${esc(value)}" placeholder="${esc(placeholder)}"${required ? ' required' : ''}></label>`;
+const select = (name, label, options, value) =>
+  `<label>${label} <select name="${name}"><option value="">Select…</option>${options.map(o =>
+    `<option${o === value ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select></label>`;
+function photoSlot(p) {
+  const src = S.draft.photos[p.id];
+  return `<div class="slot" id="slot-${p.id}">
+    <div class="thumb">${src ? `<img src="${src}" alt="">` : 'No photo'}</div>
+    <div><div class="slot-label">${esc(p.label)}</div>
+      <div class="row">
+        <label class="btn small">${src ? 'Retake' : 'Take photo'}<input type="file" accept="image/*" capture="environment" data-photo="${p.id}" hidden></label>
+        ${src ? `<button type="button" class="btn small ghost" data-act="removePhoto" data-slot="${p.id}">Remove</button>` : ''}
+      </div></div></div>`;
+}
+function viewEdit() {
+  const d = S.draft;
+  const isNew = !d.id;
+  return `<h1>${isNew ? 'Add a key' : 'Edit key'}</h1>
+  <form id="keyForm" class="card stack">
+    ${field('name', 'Name', d.name, 'e.g. Main door, Bedroom almirah', true)}
+    ${field('location', 'Where is the lock?', d.location, 'e.g. Home, ground floor')}
+    ${field('brand', 'Lock brand', d.brand, 'e.g. Godrej, Harrison, Link')}
+    ${select('lockType', 'Lock type', LOCK_TYPES, d.lockType)}
+    ${select('keyType', 'Key type', KEY_TYPES, d.keyType)}
+    ${field('keyNumber', 'Key number', d.keyNumber, 'Number stamped on the key or key card')}
+    <p class="hint">Many brands print a key number on the key, the lock or a key card. An authorised service can use it, with proof of ownership, to supply a duplicate.</p>
+    <label>Notes <textarea name="notes" rows="3">${esc(d.notes)}</textarea></label>
+    <fieldset class="photos"><legend>Photos</legend>${PHOTO_SLOTS.map(photoSlot).join('')}</fieldset>
+    ${isNew ? `<label class="check"><input type="checkbox" name="owner" required>I own this lock or am authorised to keep a record of its key.</label>` : ''}
+    <p class="error" id="err"></p>
+    <div class="row end">
+      <button type="button" class="btn ghost" data-act="cancelEdit">Cancel</button>
+      <button class="btn primary">Save</button>
+    </div>
+  </form>`;
+}
+function requestText(k) {
+  const lines = [
+    'Duplicate key request',
+    '',
+    `Lock: ${[k.brand, k.lockType].filter(Boolean).join(' ') || 'Not recorded'}`,
+    k.location ? `Location: ${k.location}` : null,
+    `Key type: ${k.keyType || 'Not recorded'}`,
+    `Key number: ${k.keyNumber || 'Not recorded'}`,
+    k.notes ? `Notes: ${k.notes}` : null,
+    '',
+    `Proof of ownership: ${k.photos.proof ? 'photo attached' : 'available on request'}.`,
+    'Please let me know how I can get a duplicate key through your authorised service, and what ID you need.',
+  ];
+  return lines.filter(l => l !== null).join('\n');
+}
+function viewLost() {
+  const k = current();
+  if (!k) { S.view = 'list'; return viewList(); }
+  return `<button class="btn ghost small" data-act="go" data-view="detail">← ${esc(k.name)}</button>
+    <h1>Replace a lost key</h1>
+    <div class="card stack">
+      <ol class="steps">
+        <li>Contact the lock manufacturer's <strong>authorised service centre</strong> or a registered locksmith.</li>
+        <li>Share the request below with them. ${k.keyNumber ? 'Your key number is included.' : '<strong>No key number is recorded</strong>, so they may need to open, re-key or replace the lock.'}</li>
+        <li>Carry photo ID and your proof of ownership (purchase bill or key card).</li>
+        <li>If the key may have been stolen with your address, consider re-keying or replacing the lock instead of copying the key.</li>
+      </ol>
+    </div>
+    <h2>Request to send</h2>
+    <pre class="request">${esc(requestText(k))}</pre>
+    <div class="row" style="margin-top:12px">
+      <button class="btn primary" data-act="share">Share…</button>
+      <button class="btn" data-act="copy">Copy text</button>
+    </div>
+    <p class="hint" style="margin-top:12px">Sharing attaches the saved photos. Only send them to a service you trust.</p>`;
+}
+function viewGuide() {
+  return `<h1>How to record a key</h1>
+  <div class="card stack">
+    <h2 style="margin-top:0">Photos</h2>
+    <ol class="steps">
+      <li>Lay the key flat on plain white paper, in daylight or bright, even light.</li>
+      <li>Hold the phone straight above the key. Fill most of the frame and keep it sharp.</li>
+      <li>Photograph both sides. Make sure any number stamped on the key is readable.</li>
+    </ol>
+    <h2>Key number</h2>
+    <p>Look for a number stamped on the key, printed on the lock body, or on the key card that came with the lock. Type it into <em>Key number</em>.</p>
+    <h2>Proof of ownership</h2>
+    <p>Photograph the purchase bill or key card. Authorised services usually ask for it before supplying a duplicate.</p>
+    <h2>Keep it safe</h2>
+    <p>Everything is encrypted on this phone. Make an encrypted backup from <em>Settings</em> and store it somewhere safe; without a backup, losing the phone loses the records.</p>
+  </div>`;
+}
+function viewSettings() {
+  return `<h1>Settings</h1>
+  <div class="card stack">
+    <h2 style="margin-top:0">Backup</h2>
+    <p class="muted">Download an encrypted backup file. It opens only with the passphrase that was in use when you made it.</p>
+    <button class="btn" data-act="backup">Download backup</button>
+  </div>
+  <div class="card stack" style="margin-top:12px">
+    <h2 style="margin-top:0">Restore from backup</h2>
+    <form id="importForm" class="stack">
+      <label>Backup file <input type="file" name="file" accept=".json,application/json" required></label>
+      <label>Backup passphrase <input type="password" name="pass" autocomplete="off" required></label>
+      <p class="hint">Keys from the backup are merged in; where a key exists in both, the newer copy wins.</p>
+      <p class="error" id="err"></p>
+      <button class="btn">Restore</button>
+    </form>
+  </div>
+  <div class="card stack" style="margin-top:12px">
+    <h2 style="margin-top:0">Security</h2>
+    <p class="muted">The vault locks after 5 minutes of inactivity.</p>
+    <button class="btn danger" data-act="erase">Erase vault from this phone</button>
+  </div>`;
+}
+
+const VIEWS = { list: viewList, detail: viewDetail, edit: viewEdit, lost: viewLost, guide: viewGuide, settings: viewSettings };
+function render() {
+  const app = $('#app');
+  const bar = $('#bar');
+  if (!S.key) {
+    bar.hidden = true;
+    app.innerHTML = S.hasVault ? viewUnlock() : viewSetup();
+    const first = app.querySelector('input');
+    if (first) first.focus();
+    return;
+  }
+  bar.hidden = false;
+  const navView = ['detail', 'edit', 'lost'].includes(S.view) ? 'list' : S.view;
+  bar.querySelectorAll('[data-view]').forEach(b => b.toggleAttribute('aria-current', b.dataset.view === navView));
+  bar.querySelectorAll('[aria-current]').forEach(b => b.setAttribute('aria-current', 'page'));
+  app.innerHTML = VIEWS[S.view]();
+  scrollTo(0, 0);
+}
+function go(view) { S.view = view; render(); }
+
+/* ---------- actions ---------- */
+function newDraft() {
+  return { name: '', location: '', brand: '', lockType: '', keyType: '', keyNumber: '', notes: '', photos: {} };
+}
+function download(name, text) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); toast('Copied'); }
+  catch { toast('Could not copy. Select the text and copy it manually.'); }
+}
+
+const actions = {
+  go: d => go(d.view),
+  lock: () => lock(),
+  add: () => { S.draft = newDraft(); go('edit'); },
+  open: d => { S.currentId = d.id; go('detail'); },
+  edit: () => {
+    const k = current();
+    S.draft = { ...k, photos: { ...k.photos } };
+    go('edit');
+  },
+  cancelEdit: () => { const wasNew = !S.draft.id; S.draft = null; go(wasNew ? 'list' : 'detail'); },
+  removePhoto: d => {
+    delete S.draft.photos[d.slot];
+    $(`#slot-${d.slot}`).outerHTML = photoSlot(PHOTO_SLOTS.find(p => p.id === d.slot));
+  },
+  delete: async () => {
+    const k = current();
+    if (!confirm(`Delete "${k.name}" and its photos? This cannot be undone.`)) return;
+    await DB.del('keys', k.id);
+    S.items = S.items.filter(i => i.id !== k.id);
+    S.currentId = null;
+    go('list');
+    toast('Key deleted');
+  },
+  lost: () => go('lost'),
+  copy: () => copyText(requestText(current())),
+  share: async () => {
+    const k = current();
+    const text = requestText(k);
+    const files = PHOTO_SLOTS.filter(p => k.photos[p.id]).map(p => dataUrlToFile(k.photos[p.id], `${p.id}.jpg`));
+    try {
+      if (files.length && navigator.canShare && navigator.canShare({ files })) {
+        await navigator.share({ title: 'Duplicate key request', text, files });
+      } else if (navigator.share) {
+        await navigator.share({ title: 'Duplicate key request', text });
+      } else {
+        await copyText(text);
+      }
+    } catch (e) {
+      if (e.name !== 'AbortError') toast('Sharing failed. Use Copy text instead.');
+    }
+  },
+  backup: async () => {
+    const meta = await DB.get('meta', 'vault');
+    const records = await DB.all('keys');
+    const file = {
+      app: 'keyvault', version: 1,
+      salt: toB64(meta.salt),
+      check: { iv: toB64(meta.check.iv), ct: toB64(meta.check.ct) },
+      records: records.map(r => ({ id: r.id, updated: r.updated, iv: toB64(r.iv), ct: toB64(r.ct) })),
+    };
+    download(`keyvault-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(file));
+    toast('Backup downloaded');
+  },
+  erase: async () => {
+    if (!confirm('Erase all keys and photos from this phone? Make sure you have a backup.')) return;
+    if (!confirm('This cannot be undone. Erase the vault?')) return;
+    await DB.clear('keys');
+    await DB.clear('meta');
+    S.hasVault = false;
+    lock('Vault erased');
+  },
+};
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (el && actions[el.dataset.act]) actions[el.dataset.act](el.dataset);
+});
+
+document.addEventListener('change', async e => {
+  const input = e.target.closest('input[data-photo]');
+  if (!input || !input.files[0]) return;
+  const slot = input.dataset.photo;
+  try {
+    S.draft.photos[slot] = await compressImage(input.files[0]);
+    $(`#slot-${slot}`).outerHTML = photoSlot(PHOTO_SLOTS.find(p => p.id === slot));
+  } catch (err) {
+    toast(err.message);
+  }
+});
+
+async function withBusy(form, fn) {
+  const btn = form.querySelector('button:not([type=button])');
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Working…';
+  try { await fn(); } finally { if (btn.isConnected) { btn.disabled = false; btn.textContent = label; } }
+}
+
+const forms = {
+  async setupForm(form, fd) {
+    const pass = fd.get('pass');
+    if (pass !== fd.get('pass2')) { $('#err').textContent = 'The passphrases do not match.'; return; }
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const key = await deriveKey(pass, salt);
+    const check = await seal(key, CHECK_VALUE);
+    await DB.put('meta', { salt, check }, 'vault');
+    S.hasVault = true;
+    S.key = key;
+    S.items = [];
+    resetIdle();
+    go('list');
+  },
+  async unlockForm(form, fd) {
+    const meta = await DB.get('meta', 'vault');
+    const key = await deriveKey(fd.get('pass'), meta.salt);
+    if (!(await verify(key, meta.check))) {
+      $('#err').textContent = 'Wrong passphrase.';
+      form.pass.select();
+      return;
+    }
+    S.key = key;
+    await loadItems();
+    resetIdle();
+    go('list');
+  },
+  async keyForm(form, fd) {
+    const d = S.draft;
+    for (const f of ['name', 'location', 'brand', 'lockType', 'keyType', 'keyNumber', 'notes']) d[f] = (fd.get(f) || '').trim();
+    if (!d.name) { $('#err').textContent = 'Please give the key a name.'; return; }
+    const item = { ...d, id: d.id || crypto.randomUUID(), updated: Date.now() };
+    await saveItem(item);
+    S.items = [...S.items.filter(i => i.id !== item.id), item].sort((a, b) => a.name.localeCompare(b.name));
+    S.draft = null;
+    S.currentId = item.id;
+    go('detail');
+    toast('Saved');
+  },
+  async importForm(form, fd) {
+    let file;
+    try {
+      file = JSON.parse(await fd.get('file').text());
+      if (file.app !== 'keyvault' || !Array.isArray(file.records)) throw new Error();
+    } catch { $('#err').textContent = 'That is not a Key Vault backup file.'; return; }
+    const backupKey = await deriveKey(fd.get('pass'), fromB64(file.salt));
+    const check = { iv: fromB64(file.check.iv), ct: fromB64(file.check.ct) };
+    if (!(await verify(backupKey, check))) { $('#err').textContent = 'Wrong passphrase for this backup.'; return; }
+    let added = 0;
+    for (const r of file.records) {
+      const existing = S.items.find(i => i.id === r.id);
+      if (existing && existing.updated >= r.updated) continue;
+      const data = await unseal(backupKey, { iv: fromB64(r.iv), ct: fromB64(r.ct) });
+      const item = { ...data, id: r.id, updated: r.updated };
+      await saveItem(item);
+      S.items = [...S.items.filter(i => i.id !== item.id), item];
+      added++;
+    }
+    S.items.sort((a, b) => a.name.localeCompare(b.name));
+    form.reset();
+    toast(added ? `Restored ${added} key${added === 1 ? '' : 's'}` : 'Nothing new in that backup');
+  },
+};
+
+document.addEventListener('submit', async e => {
+  const form = e.target;
+  if (!forms[form.id]) return;
+  e.preventDefault();
+  const err = $('#err');
+  if (err) err.textContent = '';
+  try {
+    await withBusy(form, () => forms[form.id](form, new FormData(form)));
+  } catch (ex) {
+    console.error(ex);
+    if ($('#err')) $('#err').textContent = 'Something went wrong. Please try again.';
+  }
+});
+
+/* ---------- start ---------- */
+(async function start() {
+  if (!window.crypto || !crypto.subtle || !window.indexedDB) {
+    $('#app').innerHTML = '<div class="card"><p>This browser cannot run Key Vault securely. Open it over https in an up-to-date Chrome or Safari.</p></div>';
+    return;
+  }
+  await DB.open();
+  S.hasVault = !!(await DB.get('meta', 'vault'));
+  render();
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+})();
+</script>
+</body>
+</html>
